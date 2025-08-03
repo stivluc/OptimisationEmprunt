@@ -8,6 +8,16 @@ export interface SimulationParams {
   fraisNotaire: number;
   fraisEntretien: number;
   assuranceEmprunt: number;
+  // French property costs
+  taxeFonciere: number; // Property tax (% of property value per year)
+  chargesCopropriete: number; // Condo fees (€ per month per m²)
+  assuranceHabitation: number; // Home insurance (€ per month)
+  surfaceLogement: number; // Property surface in m²
+  // Rent vs buy comparison
+  loyerMensuel: number; // Monthly rent for equivalent property
+  // Comparison controls
+  dureeComparaison: number; // Duration for rent vs buy comparison
+  prixComparaison: number; // Price for rent vs buy comparison
   prixMin: number;
   prixMax: number;
 }

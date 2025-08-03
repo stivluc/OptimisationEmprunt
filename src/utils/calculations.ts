@@ -11,40 +11,71 @@ export const calculerValeurImmobiliere = (prixAchat: number, dureeAnnees: number
   return prixAchat * Math.pow(1 + tauxAppreciation / 100, dureeAnnees);
 };
 
+export const calculerChargesFrancaises = (prixAchat: number, params: SimulationParams): number => {
+  // Taxe foncière (annually -> monthly)
+  const taxeFonciereMensuelle = (prixAchat * params.taxeFonciere / 100) / 12;
+  
+  // Charges de copropriété (monthly)
+  const chargesCoproMensuelles = params.chargesCopropriete * params.surfaceLogement;
+  
+  // Assurance habitation (monthly)
+  const assuranceHabitation = params.assuranceHabitation;
+  
+  // Frais d'entretien généraux (monthly)
+  const entretienMensuel = (prixAchat * params.fraisEntretien / 100) / 12;
+  
+  return taxeFonciereMensuelle + chargesCoproMensuelles + assuranceHabitation + entretienMensuel;
+};
+
 export const comparerStrategieApport = (prixAchat: number, dureeAnnees: number, params: SimulationParams): ComparisonResult | null => {
-  const maxInvestissement = params.revenus * 0.4;
+  const capaciteInvestissementMax = params.revenus * 0.4; // 40% of income for real estate
   const fraisAchat = prixAchat * (params.fraisNotaire / 100);
+  
+  // Calculate French property costs
+  const chargesFrancaises = calculerChargesFrancaises(prixAchat, params);
   
   // STRATÉGIE 1: AVEC APPORT
   const apportUtilise = Math.min(params.apportDisponible, prixAchat * 0.2);
   const capitalEmprunte1 = prixAchat - apportUtilise;
   const mensualite1 = calculerMensualite(capitalEmprunte1, params.tauxEmprunt, dureeAnnees);
-  const assurance1 = (capitalEmprunte1 * params.assuranceEmprunt / 100) / 12;
-  const entretien1 = (prixAchat * params.fraisEntretien / 100) / 12;
-  const charges1 = mensualite1 + assurance1 + entretien1;
+  const assuranceEmprunt1 = (capitalEmprunte1 * params.assuranceEmprunt / 100) / 12;
   
-  if (charges1 > maxInvestissement) return null;
+  // Total monthly property costs
+  const chargesImmobilieres1 = mensualite1 + assuranceEmprunt1 + chargesFrancaises;
   
-  const investETF1 = maxInvestissement - charges1;
+  // Check if property costs exceed capacity
+  if (chargesImmobilieres1 > capaciteInvestissementMax) return null;
+  
+  // Remaining capacity for additional investments
+  const capaciteRestante1 = capaciteInvestissementMax - chargesImmobilieres1;
+  
+  // Investment strategy: use 80% of remaining capacity for monthly investments
+  const investissementMensuel1 = capaciteRestante1 * 0.8;
   const apportRestant1 = params.apportDisponible - apportUtilise;
   
   // STRATÉGIE 2: SANS APPORT
   const capitalEmprunte2 = prixAchat;
   const mensualite2 = calculerMensualite(capitalEmprunte2, params.tauxEmprunt, dureeAnnees);
-  const assurance2 = (capitalEmprunte2 * params.assuranceEmprunt / 100) / 12;
-  const entretien2 = (prixAchat * params.fraisEntretien / 100) / 12;
-  const charges2 = mensualite2 + assurance2 + entretien2;
+  const assuranceEmprunt2 = (capitalEmprunte2 * params.assuranceEmprunt / 100) / 12;
   
-  if (charges2 > maxInvestissement) return null;
+  // Total monthly property costs
+  const chargesImmobilieres2 = mensualite2 + assuranceEmprunt2 + chargesFrancaises;
   
-  const investETF2 = maxInvestissement - charges2;
-  const apportRestant2 = params.apportDisponible;
+  // Check if property costs exceed capacity
+  if (chargesImmobilieres2 > capaciteInvestissementMax) return null;
   
-  // Calcul des patrimoines finaux
+  // Remaining capacity for additional investments
+  const capaciteRestante2 = capaciteInvestissementMax - chargesImmobilieres2;
+  
+  // Investment strategy: use 80% of remaining capacity for monthly investments
+  const investissementMensuel2 = capaciteRestante2 * 0.8;
+  const apportRestant2 = params.apportDisponible; // All available for investing
+  
+  // Calculate final patrimony
   const valeurImmo = calculerValeurImmobiliere(prixAchat, dureeAnnees, params.inflation);
   const capitalFinal = params.capitalInvesti * Math.pow(1 + params.rendementCapitalInvesti / 100, dureeAnnees);
   
-  // Investissements mensuels capitalisés
+  // Monthly investments capitalized
   const tauxInvestMensuel = params.rendementCapitalInvesti / 100 / 12;
   const nbMois = dureeAnnees * 12;
   
@@ -56,31 +87,31 @@ export const comparerStrategieApport = (prixAchat: number, dureeAnnees: number, 
     return valeur;
   };
   
-  // Stratégie 1 (avec apport)
-  const investMensuels1 = calculerInvestCapitalise(investETF1);
+  // Strategy 1 (with down payment)
+  const investMensuels1 = calculerInvestCapitalise(investissementMensuel1);
   const apportInvesti1 = apportRestant1 * Math.pow(1 + params.rendementCapitalInvesti / 100, dureeAnnees);
   const patrimoine1 = valeurImmo + investMensuels1 + apportInvesti1 + capitalFinal - fraisAchat;
   
-  // Stratégie 2 (sans apport)
-  const investMensuels2 = calculerInvestCapitalise(investETF2);
+  // Strategy 2 (without down payment)
+  const investMensuels2 = calculerInvestCapitalise(investissementMensuel2);
   const apportInvesti2 = apportRestant2 * Math.pow(1 + params.rendementCapitalInvesti / 100, dureeAnnees);
   const patrimoine2 = valeurImmo + investMensuels2 + apportInvesti2 + capitalFinal - fraisAchat;
   
-  // Retourne la meilleure stratégie
+  // Return the best strategy
   const meilleure = patrimoine2 > patrimoine1 ? 'sans_apport' : 'avec_apport';
   const meilleureStrategie = meilleure === 'sans_apport' ? {
     apportUtilise: 0,
     capitalEmprunte: capitalEmprunte2,
     mensualite: mensualite2,
-    charges: charges2,
-    investETF: investETF2,
+    charges: chargesImmobilieres2,
+    investETF: investissementMensuel2,
     patrimoine: patrimoine2
   } : {
     apportUtilise,
     capitalEmprunte: capitalEmprunte1,
     mensualite: mensualite1,
-    charges: charges1,
-    investETF: investETF1,
+    charges: chargesImmobilieres1,
+    investETF: investissementMensuel1,
     patrimoine: patrimoine1
   };
   
@@ -92,16 +123,16 @@ export const comparerStrategieApport = (prixAchat: number, dureeAnnees: number, 
       apportUtilise,
       capitalEmprunte: capitalEmprunte1,
       mensualite: mensualite1,
-      charges: charges1,
-      investETF: investETF1,
+      charges: chargesImmobilieres1,
+      investETF: investissementMensuel1,
       patrimoine: patrimoine1
     },
     sansApport: {
       apportUtilise: 0,
       capitalEmprunte: capitalEmprunte2,
       mensualite: mensualite2,
-      charges: charges2,
-      investETF: investETF2,
+      charges: chargesImmobilieres2,
+      investETF: investissementMensuel2,
       patrimoine: patrimoine2
     },
     ecart: Math.abs(patrimoine2 - patrimoine1),
@@ -113,6 +144,6 @@ export const comparerStrategieApport = (prixAchat: number, dureeAnnees: number, 
     investETFOptimal: meilleureStrategie.investETF,
     apportOptimal: meilleureStrategie.apportUtilise,
     tauxEndettement: (meilleureStrategie.charges / params.revenus) * 100,
-    capaciteRestante: (params.revenus * 0.4) - meilleureStrategie.charges
+    capaciteRestante: meilleure === 'sans_apport' ? capaciteRestante2 : capaciteRestante1
   };
 };

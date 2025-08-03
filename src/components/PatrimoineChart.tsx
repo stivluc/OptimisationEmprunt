@@ -1,6 +1,6 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Target, Zap, Settings, Beaker } from 'lucide-react';
+import { TrendingUp, Beaker } from 'lucide-react';
 import { ComparisonResult } from '../types';
 
 interface PatrimoineChartProps {
@@ -32,6 +32,8 @@ const PatrimoineChart: React.FC<PatrimoineChartProps> = ({
               dataKey="prix" 
               stroke="#9ca3af"
               label={{ value: 'Prix d\'achat (k€)', position: 'insideBottom', offset: -5, fill: '#9ca3af' }}
+              interval="preserveStartEnd"
+              tickCount={8}
             />
             <YAxis 
               stroke="#9ca3af"
@@ -50,7 +52,7 @@ const PatrimoineChart: React.FC<PatrimoineChartProps> = ({
               ]}
               labelFormatter={(label) => `Prix: ${label}k €`}
             />
-            <Legend />
+            <Legend wrapperStyle={{ paddingTop: '20px' }} />
             {durations.map((duration, index) => (
               <Line 
                 key={duration}
@@ -66,39 +68,6 @@ const PatrimoineChart: React.FC<PatrimoineChartProps> = ({
         </ResponsiveContainer>
       </div>
       
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg">
-          <div className="font-semibold text-blue-300 mb-2 flex items-center gap-2">
-            <Target className="text-blue-400" size={16} />
-            Maximum Global
-          </div>
-          <div className="text-white text-sm">
-            <div>Prix : {strategieAbsolue?.prixAchat.toLocaleString()} €</div>
-            <div>Patrimoine : {Math.round((strategieAbsolue?.patrimoineOptimal || 0) / 1000)}k €</div>
-          </div>
-        </div>
-        
-        <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg">
-          <div className="font-semibold text-green-300 mb-2 flex items-center gap-2">
-            <Zap className="text-green-400" size={16} />
-            Configuration
-          </div>
-          <div className="text-white text-sm">
-            <div>Durée : {strategieAbsolue?.dureeAnnees} ans</div>
-            <div>Mode : {strategieAbsolue?.strategieOptimale === 'sans_apport' ? 'Sans apport' : 'Avec apport'}</div>
-          </div>
-        </div>
-        
-        <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-lg">
-          <div className="font-semibold text-purple-300 mb-2 flex items-center gap-2">
-            <Settings className="text-purple-400" size={16} />
-            Algorithme
-          </div>
-          <div className="text-white text-xs">
-            Testée {optimiserToutesStrategies.length.toLocaleString()} combinaisons pour trouver l'optimum global
-          </div>
-        </div>
-      </div>
       
       <div className="mt-6 bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4">
         <h3 className="font-semibold text-white/90 mb-4 flex items-center gap-2">
