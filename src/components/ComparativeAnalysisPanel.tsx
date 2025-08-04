@@ -1,6 +1,6 @@
 import React from 'react';
 import { Scale, Home, TrendingUp, Calculator, Clock, Building2 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { ComparisonResult, LogiqueApport, SimulationParams } from '../types';
 import { comparerStrategieApport } from '../utils/calculations';
 
@@ -229,9 +229,9 @@ const ComparativeAnalysisPanel: React.FC<ComparativeAnalysisPanelProps> = ({ str
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={(() => {
-                const durees = [10, 15, 20, 25];
+                const durees = [10, 15, 20, 25, 30, 35, 40, 45];
                 return durees.map(duree => {
-                  // Calcul location
+                  // Calcul location - IDENTIQUE pour toute la durée (pas de changement après 25 ans)
                   const capaciteMax = params.revenus * 0.4;
                   const loyerTotal = params.loyerMensuel;
                   const capaciteRestanteLocation = capaciteMax - loyerTotal;
@@ -246,9 +246,54 @@ const ComparativeAnalysisPanel: React.FC<ComparativeAnalysisPanelProps> = ({ str
                   const apportInvestiLocation = params.apportDisponible * Math.pow(1 + params.rendementCapitalInvesti / 100, duree);
                   patrimoineLocation += investMensuelsLocation + apportInvestiLocation;
                   
-                  // Calcul achat
-                  const strategieAchat = comparerStrategieApport(params.prixComparaison, duree, params);
-                  const patrimoineAchat = strategieAchat ? strategieAchat.patrimoineOptimal : null;
+                  // Calcul achat - distinguer période de prêt vs post-prêt
+                  let patrimoineAchat = null;
+                  const dureePreDeterminee = params.dureeComparaison; // Durée du prêt selon le toggle
+                  
+                  if (duree <= dureePreDeterminee) {
+                    // Période normale de prêt
+                    const strategieAchat = comparerStrategieApport(params.prixComparaison, duree, params);
+                    patrimoineAchat = strategieAchat ? strategieAchat.patrimoineOptimal : null;
+                  } else {
+                    // Période post-prêt - prêt est remboursé
+                    const strategieBase = comparerStrategieApport(params.prixComparaison, dureePreDeterminee, params);
+                    if (strategieBase) {
+                      const anneesSupplementaires = duree - dureePreDeterminee;
+                      const valeurImmoFuture = strategieBase.valeurImmo * Math.pow(1 + params.inflation / 100, anneesSupplementaires);
+                      const capitalFinalFuture = strategieBase.capitalFinal * Math.pow(1 + params.rendementCapitalInvesti / 100, anneesSupplementaires);
+                      
+                      // Charges françaises uniquement (plus de mensualité de prêt)
+                      const chargesFrancaises = (params.prixComparaison * params.taxeFonciere / 100 / 12) + 
+                                               (params.chargesCopropriete * params.surfaceLogement) + 
+                                               params.assuranceHabitation + 
+                                               (params.prixComparaison * params.fraisEntretien / 100 / 12);
+                      
+                      // Capacité d'investissement libérée (plus de mensualité)
+                      // Après remboursement du prêt, on peut investir TOUS les 40% des revenus moins les charges
+                      const capaciteLibere = capaciteMax - chargesFrancaises;
+                      const investissementMensuelLibere = capaciteLibere; // 100% de la capacité disponible !
+                      
+                      // Capitalisation des nouveaux investissements post-prêt
+                      let investSupplementaires = 0;
+                      const tauxMensuelLibere = params.rendementCapitalInvesti / 100 / 12;
+                      const nbMoisSupp = anneesSupplementaires * 12;
+                      for (let mois = 0; mois < nbMoisSupp; mois++) {
+                        investSupplementaires = (investSupplementaires + investissementMensuelLibere) * (1 + tauxMensuelLibere);
+                      }
+                      
+                      // Récupération des investissements mensuels de la période de prêt
+                      // On recalcule proprement les investissements des 25 premières années
+                      const investissementMensuelPret = strategieBase.investETFOptimal;
+                      let investMensuelsPret = 0;
+                      const tauxMPret = params.rendementCapitalInvesti / 100 / 12;
+                      for (let mois = 0; mois < dureePreDeterminee * 12; mois++) {
+                        investMensuelsPret = (investMensuelsPret + investissementMensuelPret) * (1 + tauxMPret);
+                      }
+                      const investMensuelsPreFuture = investMensuelsPret * Math.pow(1 + params.rendementCapitalInvesti / 100, anneesSupplementaires);
+                      
+                      patrimoineAchat = valeurImmoFuture + capitalFinalFuture + investMensuelsPreFuture + investSupplementaires;
+                    }
+                  }
                   
                   return {
                     duree: duree + 'a',
@@ -270,6 +315,7 @@ const ComparativeAnalysisPanel: React.FC<ComparativeAnalysisPanelProps> = ({ str
                   }}
                   formatter={(value: any) => [`${value}k €`, '']}
                 />
+                <ReferenceLine x={`${params.dureeComparaison}a`} stroke="#fbbf24" strokeDasharray="3 3" label={{ value: "Prêt remboursé", position: "top", fill: "#fbbf24", fontSize: 10 }} />
                 <Line type="monotone" dataKey="location" stroke="#a855f7" strokeWidth={2} dot={false} name="Location" />
                 <Line type="monotone" dataKey="achat" stroke="#3b82f6" strokeWidth={2} dot={false} name="Achat" connectNulls={false} />
               </LineChart>
